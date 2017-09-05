@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<link href="css/style.css" rel="stylesheet" type="text/css">
+	<title>FractalTree</title>
+	<link href="https://fonts.googleapis.com/css?family=Montserrat+Subrayada" rel="stylesheet">
+</head>
+<body>
+	<div id="controls">
+		<p>Fractal Tree Generator 3D</p>
+		<h1>
+			Enjoy (version 1.0)
+		</h1>
+		<h2>Controls</h2>
+		<ul>
+			<li>
+				Double click on the terrain to create a tree
+			</li>
+			<li>
+				Double click on the base of a tree to select it
+			</li>
+			<li>
+				When a tree is selected, move the mouse to move it, or press cancell to delete it
+			</li>
+			<li>
+				Change the option below to change the tree parameters, textures, colors e much more...
+			</li>
+		</ul>
+		<div>
+			<h2>FPS</h2>
+		</div>
+		<div id="fps-container">
+		</div>
+		<h2>Options</h2>
+		<div id="controls-container"> 
+		</div>
+
+	</div>
+	<div id="canvas">
+	</div>
+	<script src="js/three.min.js"></script>
+	<script src="js/ConvexGeometry.js"></script>
+	<script src="js/Orbit.js"></script>
+	<script src="js/Tween.js"></script>
+	<script src="js/dat.gui.js"></script>
+	<script src="js/Tree.js"></script>
+	<script src="js/Queue.js"></script>
+	<script src="js/Stats.js"></script>
+	<script>
+    //Global variables and function
+    function MINNEWH(h) { return h / 2; };
+    function MAXNEWH(h) { return h * 6 / 7; };
+    function MAXDELTA(h) { return h * 7 / 5; };
+    var raycaster = new THREE.Raycaster();
+    var mouse3D = new THREE.Vector3();
+    var mouse3D1 = new THREE.Vector3();
+    var nummesh = 7;
+    var fristmesh = 7;
+    var globalheigth = 250;
+    var globalwidth = 30;
+    var globalmaterialtree = new THREE.MeshNormalMaterial({ shading: THREE.FlatShading });
+    var globalsplitanglethree = 7 / 5;
+    var globalrecusionleveltree = 45;
+    var globalsplitprobabilitytree = 3;
+    var globalgrowth = "BF";
+    var globalvel = 500;
+    var Alltree = new Array();
+    var colorselem = 0x70b170 ;
+    var loader = new THREE.TextureLoader();
+    var mycontrols = document.getElementById('controls');
+    var counter=0;
+    //mycontrols.style.width = window.innerWidth/5  +"px";
+    //mycontrols.style.height =  window.innerHeight+"px";
+    function SeleObj(mesh, tree) {
+    	this.s = mesh;
+    	this.obj = tree;
+    }
+    function MyMesh(mesh,tween, i) {
+    	this.tween = tween;
+    	this.mesh = mesh;
+    	this.i = i;
+    }
+    function MyTree(x, y, z, h, l) {
+    	this.x = x;
+    	this.y = y;
+    	this.z = z;
+    	this.h = h;
+    	this.l = l;
+    	this.dx=0;
+    	this.dz=0;
+    	this.branchestree;
+    	this.currentnodebranch;
+    	this.seleobj;
+    	this.group = new THREE.Object3D();
+    	this.parent = new THREE.Object3D();
+    	Alltree.push(this);
+    	var points = [
+    	new THREE.Vector3(this.x, 0, this.z),
+    	new THREE.Vector3(this.x, 0, this.z + this.l),
+    	new THREE.Vector3(this.x + this.l, 0, this.z + this.l),
+    	new THREE.Vector3(this.x + this.l, 0, this.z),
+    	new THREE.Vector3(this.x, 1, this.z),
+    	new THREE.Vector3(this.x, 1, this.z + this.l),
+    	new THREE.Vector3(this.x + this.l, 1, this.z + this.l),
+    	new THREE.Vector3(this.x + this.l, 1, this.z),
+    	];
+    	var geometry = new THREE.ConvexGeometry(points);
+    	var meshtrunk = new THREE.Mesh(geometry, globalmaterialtree);
+    	this.group.add(meshtrunk);
+    	var seleg = new THREE.CylinderGeometry( globalwidth *2 + 20 , globalwidth*2 + 20, 15, 24 );
+    	var selem = new THREE.MeshNormalMaterial({  shading: THREE.FlatShading ,  side : THREE.DoubleSide});
+    	selem.transparent = true;
+    	selem.opacity = 0.9;
+    	var selemesh = new THREE.Mesh(seleg, selem);
+    	selemesh.position.set(x + globalwidth/2 , y , z + globalwidth/2 );
+    	var seleobj = new SeleObj(selemesh, this);
+    	this.seleobj = seleobj;
+    	scene.add(this.seleobj.s);
+    	nummesh +=2;
+    	meshtrunk.geometry.dynamic = true;
+    	var tween = new TWEEN.Tween({ b: 1 }).to({ b: this.h }, globalvel )
+    	.easing(TWEEN.Easing.Linear.None)
+    	.onUpdate(function () {
+    		meshtrunk.geometry.vertices[4].setY(this.b);
+    		meshtrunk.geometry.vertices[5].setY(this.b);
+    		meshtrunk.geometry.vertices[6].setY(this.b);
+    		meshtrunk.geometry.vertices[7].setY(this.b);
+    		meshtrunk.geometry.vertices[7].setY(this.b);
+    		meshtrunk.geometry.verticesNeedUpdate = true;
+    	});
+    	counter++;
+    	this.branchestree = new Tree(new MyMesh(meshtrunk,tween, counter));
+    	this.currentnodebranch = this.branchestree._root;
+    	var r = getRandomInt(1, globalsplitprobabilitytree + 3);
+    	for (var i = 0; i < r; i++) {
+    		var newh = getRandom(MINNEWH(this.h), MAXNEWH(this.h));
+    		this.addRecursive(this.x, this.y + this.h, this.z, newh, this.l / 2);
+    	}
+    	scene.add(this.group);
+    }
+    MyTree.prototype = {
+    	addRecursive: function (x, y, z, h, l) {
+    		var deltax = getRandom(-globalsplitanglethree * h, globalsplitanglethree * h);
+    		var deltaz = getRandom(-globalsplitanglethree * h, globalsplitanglethree * h);
+    		var points = [
+    		new THREE.Vector3(x, y, z),
+    		new THREE.Vector3(x, y, z + l * 2),
+    		new THREE.Vector3(x + l * 2, y, z + l * 2),
+    		new THREE.Vector3(x + l * 2, y, z),
+
+    		new THREE.Vector3(x, y + 1, z),
+    		new THREE.Vector3(x, y + 1, z + l * 2),
+    		new THREE.Vector3(x + l * 2, y + 1, z + l * 2),
+    		new THREE.Vector3(x + l * 2, y + 1, z),
+    		];
+    		var geometry = new THREE.ConvexGeometry(points);
+    		var mesh = new THREE.Mesh(geometry, globalmaterialtree);
+    		this.group.add(mesh);
+    		nummesh++;
+    		mesh.geometry.dynamic = true;
+    		var mytween = new TWEEN.Tween({ a: x, b: y, c: z }).to({ a: x + deltax, b: y + h, c: z + deltaz }, globalvel).easing(TWEEN.Easing.Linear.None)
+    		.onUpdate(function () {
+    			mesh.geometry.vertices[4].setX(this.a);
+    			mesh.geometry.vertices[5].setX(this.a);
+    			mesh.geometry.vertices[6].setX(this.a + l);
+    			mesh.geometry.vertices[7].setX(this.a + l);
+
+    			mesh.geometry.vertices[4].setY(this.b);
+    			mesh.geometry.vertices[5].setY(this.b);
+    			mesh.geometry.vertices[6].setY(this.b);
+    			mesh.geometry.vertices[7].setY(this.b);
+
+    			mesh.geometry.vertices[4].setZ(this.c);
+    			mesh.geometry.vertices[5].setZ(this.c + l);
+    			mesh.geometry.vertices[6].setZ(this.c + l);
+    			mesh.geometry.vertices[7].setZ(this.c);
+    			mesh.geometry.verticesNeedUpdate = true;
+    		});
+    		counter++;
+    		this.currentnodebranch = this.branchestree.add(new MyMesh(mesh,mytween, counter), this.currentnodebranch.data, this.branchestree.traverseDF);
+    		var r = getRandomInt(1, globalsplitprobabilitytree );
+    		for (var i = 0; i < r; i++) {
+    			var newh = getRandom(MINNEWH(h), MAXNEWH(h));
+    			if (newh < globalrecusionleveltree) {
+    				break;
+    			}
+    			else {
+    				this.addRecursive(x + deltax, y + h, z + deltaz, newh, l / 2);
+    			}
+    		}
+    		this.currentnodebranch = this.currentnodebranch.parent;
+    	},
+    	activateTree: function () {
+    		if (globalgrowth == "DF") {
+    			var a = null;
+    			this.branchestree.traverseDF(function (node) {
+    				if (a) {
+    					node.data.tween.chain(a.data.tween);
+    				}
+    				a = node;
+    			});
+    			this.branchestree._root.data.tween.start();
+    		}
+    		else if (globalgrowth == "BF") {
+    			var comand;
+    			this.branchestree.traverseBF(function (node) {
+    				if (node.children.length != 0) {
+    					comand = "node.data.tween.chain("
+    					for (var i = 0; i < node.children.length; i++) {
+    						comand = comand + ("node.children[" + i + "].data.tween");
+    						if (i != node.children.length - 1) {
+    							comand = comand + (",");
+    						}
+    					}
+    					comand = comand + ");";
+    					eval(comand);
+    				};
+    			});
+    			this.branchestree._root.data.tween.start();
+    		}
+    		else {
+    			this.branchestree.traverseBF(function (node) {
+    				node.data.tween.start();
+    			});
+    		};
+    	},
+    	moveTree : function(x,z){
+    		this.dx = x-this.x;
+    		this.dz = z-this.z;
+    		this.group.position.set(this.dx,0,this.dz);
+    		this.seleobj.s.position.set(x,0,z);
+    	},
+    	deleteTree: function () {
+    		scene.remove(this.seleobj.s)
+    		scene.remove(this.group)
+    	},
+    };
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(60, window.innerWidth*(4/5) / window.innerHeight, 0.1, 100000);
+    camera.position.x = 2000;
+    camera.position.y = 500;
+    camera.position.z = 1000;
+    camera.rotateX(1)
+    var renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
+    renderer.setSize(window.innerWidth *(4/5) , window.innerHeight);
+    renderer.setPixelRatio( window.devicePixelRatio );
+    var mycanvas = document.getElementById('canvas');
+    mycanvas.style.width = (window.innerWidth*(4/5))  +"px";
+    mycanvas.style.height =  window.innerHeight+"px";
+    mycanvas.style.position = 'fixed';
+    mycanvas.style.left = window.innerWidth/5  +"px";
+    mycanvas.appendChild(renderer.domElement);
+    var mycontrols = document.getElementById('controls');
+    mycontrols.style.width = window.innerWidth/5+"px";
+    mycontrols.style.height =  window.innerHeight+400+"px";
+    var stats = new Stats();
+    stats.domElement.style.position = 'relative';
+    stats.showPanel(0);
+    document.getElementById("fps-container").appendChild(stats.dom);
+    var sizeworld = 25000;
+        //terrain
+        var geometryterrain = new THREE.PlaneGeometry(2 * sizeworld, 2 * sizeworld);
+        var materialterrain = new THREE.MeshBasicMaterial({ color: 0x90EE90 });
+        var terrain = new THREE.Mesh(geometryterrain, materialterrain);
+        terrain.material.side = THREE.DoubleSide;
+        terrain.rotateX(Math.PI / 2);
+        scene.add(terrain);
+        nummesh++
+        //sky
+        var geometrysky = new THREE.SphereGeometry(sizeworld, 60, 40);
+        var sky;
+        loader.load("textures/sky/NigthSky.jpg", function (texture) {
+        	var materialsky = new THREE.MeshBasicMaterial({ map: texture });
+        	sky = new THREE.Mesh(geometrysky, materialsky);
+        	sky.material.side = THREE.DoubleSide;
+        	scene.add(sky);
+        	nummesh++
+        });
+
+        //orbitcontrols
+        var controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.maxPolarAngle = Math.PI * 0.5;
+        controls.minDistance = 20;
+        controls.maxDistance = sizeworld / 2;
+        controls.target.set(0, 300, 0);
+
+        var LogicGUI = function () {
+
+        	this.TerrainColor = "#90EE90";
+        	this.TerrainTexture = "Default";
+        	this.Fractal_COMING_SOON_ = function () { };
+
+        	this.SkyColor = "#000000";
+        	this.SkyTexture = "NigthSky";
+
+        	this.TreeColor = "#000000";
+        	this.TreeTexture = "Default";
+        	this.Height = 5;
+        	this.Width = 5;
+        	this.SlitAngle = 5;
+        	this.RecursionLever = 5;
+        	this.SplitProbability = 5;
+        	this.Speed = 5;
+
+        	this.ClearALL = function () {
+        		TWEEN.removeAll();
+        		for (var i = 0 ; i < Alltree.length; i++) {
+        			Alltree[i].deleteTree()
+        			Alltree[i]=null;
+        		}
+        		Alltree = null;
+        		Alltree = new Array();
+        	};
+        	this.Screenshot = function () {
+        		window.open(renderer.domElement.toDataURL("image/png"), "Final");
+        		return false;
+        	}
+        	this.Growth = "BF";
+        };
+        var gui = new dat.GUI({ width: (window.innerWidth/5-10) , autoPlace: false });
+        document.getElementById("controls-container").appendChild(gui.domElement);
+        var logic = new LogicGUI();
+        //terraingui
+        var terraincolor = true;
+        var terrainfolder = gui.addFolder("Terrain");
+        var colorcontrollerterrain = terrainfolder.addColor(logic, "TerrainColor");
+        colorcontrollerterrain.onChange(function (value) {
+        	if (terraincolor) {
+        		terrain.material.color.setHex("0x" + value.slice(1, 7));
+        		terrain.material.needsUpdate = true;
+        	}
+        	else {
+        		scene.remove(terrain);
+        		materialterrain = new THREE.MeshBasicMaterial({ color: value });
+        		terrain = new THREE.Mesh(geometryterrain, materialterrain);
+        		terrain.material.side = THREE.DoubleSide;
+        		terrain.rotateX(Math.PI / 2);
+        		scene.add(terrain)
+        		nummesh++;
+        	}
+        	skycolor = true;
+        });
+        var texturecontrollerterrain = terrainfolder.add(logic, "TerrainTexture", ["Default", "Grass", "Dirt", "Gravel", "Carbon"]);
+        texturecontrollerterrain.onChange(function (value) {
+        	if(value == "Default") {
+        		scene.remove(terrain);
+        		materialterrain = new THREE.MeshBasicMaterial({ color: 0x90EE90 });
+        		terrain = new THREE.Mesh(geometryterrain, materialterrain);
+        		terrain.material.side = THREE.DoubleSide;
+        		terrain.rotateX(Math.PI / 2);
+        		scene.add(terrain);
+        		nummesh++
+        		terraincolor = true;
+        		return;
+        	}
+        	loader.load("textures/terrain/" + value + ".jpg", function (texture) {
+        		texture.wrapS = THREE.RepeatWrapping;
+        		texture.wrapT = THREE.RepeatWrapping;
+        		texture.repeat.set(130, 130);
+        		scene.remove(terrain);
+        		materialterrain = new THREE.MeshBasicMaterial({ map: texture });
+        		terrain = new THREE.Mesh(geometryterrain, materialterrain);
+        		terrain.material.side = THREE.DoubleSide;
+        		terrain.rotateX(Math.PI / 2);
+        		scene.add(terrain);
+        		nummesh++
+        		terraincolor = false;
+        	})
+        });
+        terrainfolder.add(logic, "Fractal_COMING_SOON_");
+        //skygui
+        var skycolor = false;
+        var skyfolder = gui.addFolder("Sky");
+        var texturecontrollersky = skyfolder.add(logic, "SkyTexture", ["NigthSky", "DaySky", "Galaxy", "Aurora"]);
+        texturecontrollersky.onFinishChange(function (value) {
+        	loader.load("textures/sky/" + value + ".jpg", function (texture) {
+        		materialsky = new THREE.MeshBasicMaterial({ map: texture });
+        		scene.remove(sky);
+        		sky = new THREE.Mesh(geometrysky, materialsky);
+        		sky.material.side = THREE.DoubleSide;
+        		scene.add(sky);
+        		nummesh++
+        		skycolor = false;
+        	});
+        });
+        var colorcontrollersky = skyfolder.addColor(logic, "SkyColor");
+        colorcontrollersky.onChange(function (value) {
+        	if (skycolor) {
+        		sky.material.color.setHex("0x" + value.slice(1, 7));
+        		sky.material.needsUpdate = true;
+        	}
+        	else {
+        		scene.remove(sky);
+        		materialsky = new THREE.MeshBasicMaterial({ color: value });
+        		sky = new THREE.Mesh(geometrysky, materialsky);
+        		sky.material.side = THREE.DoubleSide;
+        		scene.add(sky);
+        		nummesh++
+        	}
+        	skycolor = true;
+        });
+        skyfolder.add(logic, "Fractal_COMING_SOON_");
+        //treegui
+        var treefolder = gui.addFolder("Tree");
+
+        var texterucontrollertree = treefolder.add(logic, "TreeTexture", ["Default", "LigthWood", "DarkWood", "Bark"]);
+        texterucontrollertree.onFinishChange(function (value) {
+        	if (value == "Default"){
+        		globalmaterialtree = new THREE.MeshNormalMaterial({ shading: THREE.FlatShading });
+        		return
+        	}
+        	loader.load("textures/tree/" + value + ".jpg", function (texture) {
+        		globalmaterialtree = new THREE.MeshBasicMaterial({ map: texture});
+        	});
+        });
+
+        var colorcontrollertree = treefolder.addColor(logic, "TreeColor");
+        colorcontrollertree.onFinishChange(function (value) {
+        	globalmaterialtree = new THREE.MeshBasicMaterial({ color: value });
+        });
+
+        var heightcontrollertree = treefolder.add(logic, "Height", 0, 10);
+        heightcontrollertree.onFinishChange(function (value) {
+        	globalheigth = value * 60 + 10;
+        });
+
+        var widthcontrollertree = treefolder.add(logic, "Width", 0, 10);
+        widthcontrollertree.onFinishChange(function (value) {
+        	globalwidth = value * 5 + 1 ;
+        });
+
+        var splitcontrollertree = treefolder.add(logic, "SlitAngle", 0, 10);
+        splitcontrollertree.onFinishChange(function (value) {
+        	globalsplitanglethree = value / 5 + 2 / 5;
+        });
+        var recursioncontrollertree = treefolder.add(logic, "RecursionLever", 0, 10);
+        recursioncontrollertree.onFinishChange(function (value) {
+        	globalrecusionleveltree = 65 - value * 4;
+        });
+        var splitpcontrollertree = treefolder.add(logic, "SplitProbability", 0, 10);
+        splitpcontrollertree.onFinishChange(function (value) {
+        	globalsplitprobabilitytree = value / (2.5) +1;
+        });
+        var speedcontrollertree = treefolder.add(logic, "Speed", 0, 10);
+        var growthNODF = globalvel;
+        var growthDF = globalvel/3;
+        speedcontrollertree.onFinishChange(function (value) {
+        	growthNODF = 1100 - value * 100;
+        	growthDF = growthNODF/3;
+        	if (globalgrowth == "DF"){
+        		globalvel = growthDF;
+        	}
+        	else {
+        		globalvel = growthNODF;
+        	}
+        });
+        var growthcontrollertree = treefolder.add(logic, "Growth", ["DF", "BF", "Simultaneos"]);
+        growthcontrollertree.onFinishChange(function (value) {
+        	if (value == "DF"){
+        		globalvel = growthDF;
+        	}
+        	else {
+        		globalvel = growthNODF;
+        	}
+        	globalgrowth = value;
+        })
+        gui.add(logic, "Screenshot");
+        gui.add(logic, "ClearALL");
+        mycanvas.addEventListener("dblclick", onDoubleClick, false);
+        mycanvas.addEventListener("mousemove", onMouseMove, false);
+        mycanvas.addEventListener("mouseup", onMouseUp, false);
+        document.addEventListener("keydown", onKeyDown, false);
+        window.addEventListener("resize", onWindowResize, false);
+        var isselected = false;
+        var tomoveindex = 0;
+        var tomovebase = null;
+        var tomovetree = null;
+        function onKeyDown(event) {
+        	if (isselected ){
+        		switch (event.keyCode){
+        			case 8:
+        			case 46:
+        			tomovetree.deleteTree();
+        			Alltree.splice(tomoveindex,1);
+        			controls.enabled = true;
+        			isselected = false;
+        			tomoveindex = 0;
+        			tomovebase = null;
+        			tomovetree = null;
+        			break;
+        		}
+
+        	}
+        }
+        function onDoubleClick(event) {
+        	mouse3D.x = (( event.clientX  - (window.innerWidth/5)) / renderer.domElement.width) * 2 - 1;
+        	mouse3D.y = - ( ( event.clientY  ) / window.innerHeight ) * 2 + 1;
+
+        	raycaster.setFromCamera(mouse3D, camera);
+        	var intersects = raycaster.intersectObjects(scene.children);
+        	if (intersects[0].object.id == terrain.id) {
+        		var t = new MyTree(intersects[0].point.x , 0, intersects[0].point.z, globalheigth + getRandom(0,globalheigth/3), globalwidth + getRandom(0,globalwidth/3));
+        		t.activateTree();
+        		return;
+        	}
+        	if (intersects[0].object.geometry.type == "CylinderGeometry") {
+        		controls.enabled = false;
+        		isselected = true;
+        		tomovebase = intersects[0];
+        		tomovebase.object.material.transparent = true;
+        		tomovebase.object.material.opacity = 0.3;
+        		for (var i = 0 ; i < Alltree.length; i++) {
+        			if (Alltree[i].seleobj.s === tomovebase.object) {
+        				tomoveindex = i;
+        				tomovetree = Alltree[tomoveindex];
+        				break;
+        			}
+        		}
+        		return;
+        	}
+        }
+        function onMouseUp(event) {
+        	if (isselected) {
+        		controls.enabled = true;
+        		isselected = false;
+        		tomovebase.object.material.opacity = 0.9;
+        		tomoveindex = 0;
+        		tomovebase = null;
+        		tomovetree = null;
+
+        	}
+        }
+        function onMouseMove(event) {
+        	if (isselected) {
+        		mouse3D.x = ( ( event.clientX - (window.innerWidth/5)) / renderer.domElement.width ) * 2 - 1;
+        		mouse3D.y = - ( ( event.clientY - 0 ) / renderer.domElement.height) * 2 + 1;
+        		raycaster.setFromCamera(mouse3D, camera);
+        		var intersects = raycaster.intersectObjects(scene.children);
+        		if (intersects[0].object.id == terrain.id) {
+        			var dx = intersects[0].point.x;
+        			var dz = intersects[0].point.z;
+        			tomovetree.moveTree(dx,dz);
+        		}
+
+        	}
+        }
+        function onWindowResize() {
+        	mycontrols.style.width = window.innerWidth/5 +"px";
+        	mycontrols.style.height =  window.innerHeight+400+"px";
+        	mycanvas.style.width = (window.innerWidth*(4/5))  +"px";
+        	mycanvas.style.height =  window.innerHeight+"px";
+        	mycanvas.style.position = 'fixed';
+        	mycanvas.style.left = window.innerWidth/5 +"px";
+        	camera.aspect = window.innerWidth*(4/5) / window.innerHeight;
+        	camera.updateProjectionMatrix();
+        	renderer.setSize(window.innerWidth*(4/5), window.innerHeight);
+        	gui.width = (window.innerWidth/5-10) ;
+        }
+        function getRandomInt(min, max) {
+        	min = Math.ceil(min);
+        	max = Math.floor(max);
+        	return Math.floor(Math.random() * (max - min)) + min;
+        }
+        function getRandom(min, max) {
+        	return (Math.random() * (max - min)) + min;
+        }
+
+        var geometry = new THREE.BoxGeometry( 50, 50, 50 );
+        var material = new THREE.MeshBasicMaterial( {
+        	color: 0xffffff, 
+        	wireframe: true
+        } );
+        var render = function () {
+        	requestAnimationFrame(render);
+        	TWEEN.update();
+        	stats.update();
+        	controls.update();
+        	renderer.render(scene, camera);
+        };
+
+        render();
+    </script>
+</body>
+</html>
